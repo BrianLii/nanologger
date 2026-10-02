@@ -8,7 +8,7 @@ stack_name=${NANOLOGGER_AWS_STACK_NAME:-nanologger-benchmark}
 samples=${NANOLOGGER_BENCH_SAMPLES:-100000}
 rate=${NANOLOGGER_BENCH_RATE:-100000}
 keep_running=${NANOLOGGER_AWS_KEEP_RUNNING:-0}
-suite=${NANOLOGGER_SUITE:-scripts/run-benchmark-suite.sh}
+suite=${NANOLOGGER_SUITE:-steady}
 ab_patch=${NANOLOGGER_AB_PATCH:-shared-cursor.patch}
 archive_file=$(mktemp -t nanologger-source.XXXXXX)
 parameters_file=$(mktemp -t nanologger-ssm.XXXXXX)
@@ -107,7 +107,7 @@ write_remote_commands() {
       "mkdir -p /opt/nanologger/src /opt/nanologger/build",
       ("printf %s " + ($payload | @sh) + " | base64 -d | tar -xz -C /opt/nanologger/src"),
       "cd /opt/nanologger/src",
-      ("NANOLOGGER_BUILD_DIR=/opt/nanologger/build NANOLOGGER_BENCH_SAMPLES=" + ($samples | @sh) + " NANOLOGGER_BENCH_RATE=" + ($rate | @sh) + " NANOLOGGER_AB_PATCH=" + ($ab_patch | @sh) + " bash " + ($suite | @sh))
+      ("NANOLOGGER_BUILD_DIR=/opt/nanologger/build NANOLOGGER_BENCH_SAMPLES=" + ($samples | @sh) + " NANOLOGGER_BENCH_RATE=" + ($rate | @sh) + " NANOLOGGER_AB_PATCH=" + ($ab_patch | @sh) + " bash " + (if ($suite | startswith("scripts/ab/")) then ($suite | @sh) else "scripts/run-benchmark-suite.sh " + ($suite | @sh) end))
     ]}' > "$parameters_file"
 }
 
