@@ -1,0 +1,93 @@
+--- a/include/nanologger_ring.hpp
++++ b/include/nanologger_ring.hpp
+@@ -27,15 +27,10 @@
+   static_assert(Capacity > 0 && (Capacity & (Capacity - 1)) == 0,
+                 "Capacity must be a power of two");
+ 
+-  // Published cursors are read by the remote side; each side's own position
+-  // and cached remote cursor live on a separate private line so the hot path
+-  // never loads a line the other core keeps pulling away.
++  // A/B baseline: each published cursor shares its line with that side's
++  // cached remote cursor, as before b18c3ff.
+   struct alignas(cache_line) Cursor {
+     std::atomic<std::size_t> value{0};
+-  };
+-
+-  struct alignas(cache_line) LocalCursor {
+-    std::size_t position{0};
+     std::size_t observed_remote{0};
+   };
+ 
+@@ -63,30 +58,30 @@
+     static_assert(sizeof(Tuple) <= SlotBytes, "record exceeds slot payload");
+     static_assert(alignof(Tuple) <= alignof(std::max_align_t));
+ 
+-    Slot* slot = claim();
++    std::size_t head;
++    Slot* slot = claim(head);
+     if (slot == nullptr) return false;
+ 
+     std::construct_at(reinterpret_cast<Tuple*>(slot->payload.data()),
+                       std::forward<Args>(args)...);
+     slot->ticks = ticks;
+     slot->decode = &decode<Formatter, Tuple>;
+-    publish();
++    publish(head);
+     return true;
+   }
+ 
+   bool try_consume(std::FILE* out) noexcept {
+-    const auto tail = consumer_.position;
+-    auto head = consumer_.observed_remote;
++    const auto tail = tail_.value.load(std::memory_order_relaxed);
++    auto head = tail_.observed_remote;
+     if (tail == head) {
+       head = head_.value.load(std::memory_order_acquire);
+-      consumer_.observed_remote = head;
++      tail_.observed_remote = head;
+       if (tail == head) return false;
+     }
+ 
+     const Slot& slot = slots_[tail & (Capacity - 1)];
+     slot.decode(out, slot.ticks, slot.payload.data());
+     tail_.value.store(tail + 1, std::memory_order_release);
+-    consumer_.position = tail + 1;
+     return true;
+   }
+ 
+@@ -108,27 +103,25 @@
+ 
+   // Returns the slot to fill, or nullptr when the ring is full. The record
+   // becomes visible to the consumer only once publish() is called.
+-  Slot* claim() noexcept {
+-    const auto head = producer_.position;
+-    auto tail = producer_.observed_remote;
++  Slot* claim(std::size_t& head) noexcept {
++    head = head_.value.load(std::memory_order_relaxed);
++    auto tail = head_.observed_remote;
+     if (head - tail >= Capacity) {
+       tail = tail_.value.load(std::memory_order_acquire);
+-      producer_.observed_remote = tail;
++      head_.observed_remote = tail;
+       if (head - tail >= Capacity) return nullptr;
+     }
+     return &slots_[head & (Capacity - 1)];
+   }
+ 
+-  void publish() noexcept {
+-    const auto head = producer_.position + 1;
+-    head_.value.store(head, std::memory_order_release);
+-    producer_.position = head;
++  // Takes the head claim() loaded, so the call reads head_ once, as the
++  // pre-b18c3ff code did.
++  void publish(std::size_t head) noexcept {
++    head_.value.store(head + 1, std::memory_order_release);
+   }
+ 
+   Cursor head_;
+   Cursor tail_;
+-  LocalCursor producer_;
+-  LocalCursor consumer_;
+   std::array<Slot, Capacity> slots_{};
+ };
+ 

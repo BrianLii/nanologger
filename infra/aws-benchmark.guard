@@ -1,0 +1,16 @@
+let instances = Resources.*[ Type == 'AWS::EC2::Instance' ]
+let security_groups = Resources.*[ Type == 'AWS::EC2::SecurityGroup' ]
+
+rule benchmark_instance_is_hardened when %instances !empty {
+  %instances.Properties.MetadataOptions.HttpTokens == 'required'
+  %instances.Properties.BlockDeviceMappings[*].Ebs.Encrypted == true
+}
+
+rule benchmark_host_has_no_inbound_access when %security_groups !empty {
+  %security_groups.Properties.SecurityGroupIngress empty
+  %security_groups.Properties.SecurityGroupEgress[*] {
+    IpProtocol == 'tcp'
+    FromPort == 443
+    ToPort == 443
+  }
+}

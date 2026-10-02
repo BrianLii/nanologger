@@ -1,0 +1,124 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CMake: Configure (Debug)",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "-S",
+        "${workspaceFolder}",
+        "-B",
+        "${workspaceFolder}/build-debug",
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DCMAKE_CXX_COMPILER=/usr/bin/clang++",
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "CMake: Build (Debug)",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "--build",
+        "${workspaceFolder}/build-debug",
+        "--parallel"
+      ],
+      "dependsOn": "CMake: Configure (Debug)",
+      "dependsOrder": "sequence",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "CMake: Test (Debug)",
+      "type": "process",
+      "command": "/opt/homebrew/bin/ctest",
+      "args": [
+        "--test-dir",
+        "${workspaceFolder}/build-debug",
+        "--output-on-failure"
+      ],
+      "dependsOn": "CMake: Build (Debug)",
+      "dependsOrder": "sequence",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Benchmark: Configure (Release)",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "-S",
+        "${workspaceFolder}",
+        "-B",
+        "${workspaceFolder}/build-benchmark",
+        "-DCMAKE_BUILD_TYPE=Release"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Benchmark: Build (Release)",
+      "type": "process",
+      "command": "/opt/homebrew/bin/cmake",
+      "args": [
+        "--build",
+        "${workspaceFolder}/build-benchmark",
+        "--parallel"
+      ],
+      "dependsOn": "Benchmark: Configure (Release)",
+      "dependsOrder": "sequence",
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "Benchmark: Run local steady",
+      "type": "process",
+      "command": "${workspaceFolder}/build-benchmark/nanologger_bench",
+      "args": [
+        "--mode",
+        "steady",
+        "--samples",
+        "100000",
+        "--rate",
+        "100000"
+      ],
+      "problemMatcher": [],
+      "dependsOn": "Benchmark: Build (Release)",
+      "group": "test"
+    },
+    {
+      "label": "AWS: Provision benchmark VM",
+      "type": "process",
+      "command": "/bin/bash",
+      "args": [
+        "${workspaceFolder}/scripts/aws-provision-benchmark.sh"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Benchmark: Run on AWS",
+      "type": "process",
+      "command": "/bin/bash",
+      "args": [
+        "${workspaceFolder}/scripts/aws-run-benchmark.sh"
+      ],
+      "options": {
+        "env": {
+          "NANOLOGGER_BENCH_SAMPLES": "100000",
+          "NANOLOGGER_BENCH_RATE": "100000"
+        }
+      },
+      "dependsOn": "AWS: Provision benchmark VM",
+      "dependsOrder": "sequence",
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}

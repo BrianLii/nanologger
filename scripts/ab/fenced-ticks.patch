@@ -1,0 +1,11 @@
+--- a/include/nanologger.hpp
++++ b/include/nanologger.hpp
+@@ -90,7 +90,7 @@
+   template <typename Formatter, typename... Args>
+   bool try_log(Args&&... args) noexcept {
+     return queue_.template try_push<Formatter>(
+-        ticks_now(), std::forward<Args>(args)...);
++        ticks_begin(), std::forward<Args>(args)...);
+   }
+ 
+   void flush() noexcept {

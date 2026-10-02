@@ -1,0 +1,8 @@
+{
+  "cmake.buildDirectory": "${workspaceFolder}/build-debug",
+  "cmake.configureOnOpen": true,
+  "cmake.configureSettings": {
+    "CMAKE_EXPORT_COMPILE_COMMANDS": true
+  },
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build-debug/compile_commands.json"
+}
